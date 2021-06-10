@@ -28,8 +28,9 @@ ACTION_LIST = ["read_comment", "like", "click_avatar",  "forward"]
 # ACTION_LIST = ["read_comment", "like", "click_avatar",  "forward", "comment", "follow", "favorite"]
 # 用于构造特征的字段列表
 FEA_COLUMN_LIST = ["read_comment", "like", "click_avatar",  "forward", "comment", "follow", "favorite"]
-# 负样本下采样比例(负样本:正样本)
-ACTION_SAMPLE_RATE = {"read_comment": 5, "like": 5, "click_avatar": 5, "forward": 10, "comment": 10, "follow": 10, "favorite": 10}
+# 每个行为的负样本下采样比例(下采样后负样本数/原负样本数)
+ACTION_SAMPLE_RATE = {"read_comment": 0.2, "like": 0.2, "click_avatar": 0.2, "forward": 0.1, "comment": 0.1, "follow": 0.1, "favorite": 0.1}
+
 # 各个阶段数据集的设置的最后一天
 STAGE_END_DAY = {"online_train": 14, "offline_train": 12, "evaluate": 13, "submit": 15}
 # 各个行为构造训练数据的天数
@@ -96,7 +97,7 @@ def statis_feature(start_day=1, before_day=7, agg='sum'):
         user_data = history_data[[dim, "date_"] + FEA_COLUMN_LIST]
         res_arr = []
         for start in range(start_day, END_DAY-before_day+1):
-            temp = user_data[(user_data["date_"]) >= start & (user_data["date_"] < (start + before_day))]
+            temp = user_data[((user_data["date_"]) >= start) & (user_data["date_"] < (start + before_day))]
             temp = temp.drop(columns=['date_'])
             temp = temp.groupby([dim]).agg([agg]).reset_index()
             temp.columns = list(map(''.join, temp.columns.values))
@@ -146,8 +147,9 @@ def generate_sample(stage="offline_train"):
         for action in ACTION_LIST: # ['read_comment', 'like', 'click_avatar', 'forward']
             action_df = df[(df["date_"] <= day) & (df["date_"] >= day - ACTION_DAY_NUM[action] + 1)] # 2882467, 只取后5天的行为用来构造训练数据
             df_neg = action_df[action_df[action] == 0] # 通过判断相应的行为==0，来收集负样本            # 2779890
-            df_neg = df_neg.sample(frac=1.0/ACTION_SAMPLE_RATE[action], random_state=SEED, replace=False) # 555978 对负样本直接进行1/5随机采样
-            df_all = pd.concat([df_neg, action_df[action_df[action] == 1]]) # 共658555，包括采样后的555978个负样本和全部102577个正样本=共658555个样本
+            df_pos = action_df[action_df[action] == 1] 
+            df_neg = df_neg.sample(frac=ACTION_SAMPLE_RATE[action], random_state=SEED, replace=False) # 555978 对负样本直接进行1/5随机采样
+            df_all = pd.concat([df_neg, df_pos]) # 共658555，包括采样后的555978个负样本和全部102577个正样本=共658555个样本
             col = ["userid", "feedid", "date_", "device"] + [action] # ['userid', 'feedid', 'date_', 'device', 'read_comment']
             file_name = os.path.join(stage_dir, stage + "_" + action + "_" + str(day) + "_generate_sample.csv") # ./data/online_train/online_train_read_comment_14_generate_sample.csv
             print('Save to: %s'%file_name)
