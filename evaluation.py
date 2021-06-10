@@ -38,7 +38,7 @@ def uAUC(labels, preds, user_id_list):
     for user_id in user_flag:
         if user_flag[user_id]:
             auc = roc_auc_score(np.asarray(user_truth[user_id]), np.asarray(user_pred[user_id]))
-            total_auc += auc 
+            total_auc += auc
             size += 1.0
     user_auc = float(total_auc)/size
     return user_auc
@@ -181,6 +181,6 @@ def score(result_data, label_data, mode="初赛"):
 if __name__ == '__main__':
     t = time.time()
     label_data = open('data/evaluate/evaluate_all_13_generate_sample.csv', 'r')
-    result_data = open('data/evaluate/submit_1619332123.csv', 'r')
+    result_data = open('data/evaluate/submit_1621500737.csv', 'r')
     res = score(result_data, label_data, mode='初赛')
     print('Time cost: %.2f s'%(time.time()-t))
