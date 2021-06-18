@@ -92,7 +92,7 @@ def statis_feature(start_day=1, before_day=7, agg='sum'):
     """
     history_data = pd.read_csv(USER_ACTION)[["userid", "date_", "feedid"] + FEA_COLUMN_LIST] # FEA_COLUMN_LIST = ['read_comment', 'like', 'click_avatar', 'forward', 'comment', 'follow', 'favorite']
     feature_dir = os.path.join(ROOT_PATH, "feature")
-    for dim in ["userid", "feedid"]:
+    for dim in ["userid", "feedid"]: # dim --> dimention
         print(dim)
         user_data = history_data[[dim, "date_"] + FEA_COLUMN_LIST]
         res_arr = []
@@ -111,7 +111,7 @@ def statis_feature(start_day=1, before_day=7, agg='sum'):
 
 def generate_sample(stage="offline_train"):
     """
-    对负样本进行下采样，生成各个阶段所需样本
+    对负样本进行下采样，生成各个阶段所需样本（不包含自定义特征）
     :param stage: String. Including "online_train"/"offline_train"/"evaluate"/"submit"
     :return: List of sample df
     """
@@ -160,7 +160,7 @@ def generate_sample(stage="offline_train"):
 
 def concat_sample(sample_arr, stage="offline_train"):
     """
-    基于样本数据和特征，生成特征数据
+    基于样本数据和特征，拼接生成特征数据
     :param sample_arr: List of sample df
     :param stage: String. Including "online_train"/"offline_train"/"evaluate"/"submit"
     """
@@ -168,18 +168,17 @@ def concat_sample(sample_arr, stage="offline_train"):
     # feed信息表
     feed_info = pd.read_csv(FEED_INFO) # 106444, FEED_INFO = ./data/wechat_algo_data1/feed_info.csv
     feed_info = feed_info.set_index('feedid') # 将默认的int自增索引改为将feedid作为索引(经过观察，feedid不重复)
-    # 基于userid统计的历史行为的次数
+    # 在statistics_feature()中，已经基于userid统计的历史行为的次数
     user_date_feature_path = os.path.join(ROOT_PATH, "feature", "userid_feature.csv")
     user_date_feature = pd.read_csv(user_date_feature_path)
     user_date_feature = user_date_feature.set_index(["userid", "date_"])
-    # 基于feedid统计的历史行为的次数
+    # 在statistics_feature()中，已经基于feedid统计的历史行为的次数
     feed_date_feature_path = os.path.join(ROOT_PATH, "feature", "feedid_feature.csv") # ./data/feature/feedid_feature.csv
     feed_date_feature = pd.read_csv(feed_date_feature_path)
     feed_date_feature = feed_date_feature.set_index(["feedid", "date_"])
 
-    for index, sample in enumerate(sample_arr): # sample_arr长度为5，分别存储了包含read_comment,like,click_avatar,forward的ua
-        features = ["userid", "feedid", "device", "authorid", "bgm_song_id", "bgm_singer_id",
-                    "videoplayseconds"]
+    for index, sample in enumerate(sample_arr): # sample_arr长度为5，分别存储了包含read_comment,like,click_avatar,forward的ua，最终生成5个不同action的样本文件
+        features = ["userid", "feedid", "device", "authorid", "bgm_song_id", "bgm_singer_id", "videoplayseconds"]
         if stage == "evaluate":
             action = "all"
             features += ACTION_LIST # ACTION_LIST=["read_comment", "like", "click_avatar",  "forward"]
@@ -193,27 +192,24 @@ def concat_sample(sample_arr, stage="offline_train"):
         sample = sample.join(feed_info, on="feedid", how="left", rsuffix="_feed") # DataFrame.join(other, on=None, how='left', lsuffix='', rsuffix='', sort=False)
         sample = sample.join(feed_date_feature, on=["feedid", "date_"], how="left", rsuffix="_feed")
         sample = sample.join(user_date_feature, on=["userid", "date_"], how="left", rsuffix="_user")
-        # 生成自定义特征列表(表头)
+        # 【生成】自定义特征列表(表头)
         feed_feature_col = [b+"sum" for b in FEA_COLUMN_LIST] # ['read_commentsum', 'likesum', 'click_avatarsum', 'forwardsum', 'commentsum', 'followsum', 'favoritesum']
         user_feature_col = [b+"sum_user" for b in FEA_COLUMN_LIST] # ['read_commentsum_user', 'likesum_user', 'click_avatarsum_user', 'forwardsum_user', 'commentsum_user', 'followsum_user', 'favoritesum_user']
-        # 填充自定义特征列表，并填充空值
+        # 【填充】自定义特征列表，并填充空值
         # sample.columns=['userid', 'feedid', 'date_', 'device', 'read_comment', 'authorid','videoplayseconds', 'description', 'ocr', 'asr', 'bgm_song_id', 'bgm_singer_id', 'manual_keyword_list', 'machine_keyword_list', 'manual_tag_list', 'machine_tag_list', 'description_char', 'ocr_char', 'asr_char', 'read_commentsum', 'likesum', 'click_avatarsum', 'forwardsum', 'commentsum', 'followsum', 'favoritesum', 'read_commentsum_user', 'likesum_user', 'click_avatarsum_user',  'forwardsum_user', 'commentsum_user', 'followsum_user','favoritesum_user']
         sample[feed_feature_col] = sample[feed_feature_col].fillna(0.0)
-        pdb.set_trace()
         sample[user_feature_col] = sample[user_feature_col].fillna(0.0)
-        sample[feed_feature_col] = np.log(sample[feed_feature_col] + 1.0) # 为什么取log
+        sample[feed_feature_col] = np.log(sample[feed_feature_col] + 1.0) # log将偏态分布的样本尽可能转化为正态分布
         sample[user_feature_col] = np.log(sample[user_feature_col] + 1.0)
         features += feed_feature_col
         features += user_feature_col # features=['userid', 'feedid', 'device', 'authorid', 'bgm_song_id', 'bgm_singer_id','videoplayseconds','read_comment', 'read_commentsum', 'likesum', 'click_avatarsum', 'forwardsum', 'commentsum', 'followsum', 'favoritesum', 'read_commentsum_user', 'likesum_user', 'click_avatarsum_user', 'forwardsum_user', 'commentsum_user', 'followsum_user', 'favoritesum_user']
         
-        
         sample[["authorid", "bgm_song_id", "bgm_singer_id"]] += 1  # 0要用于填未知, 所以有效数据区间应该+1从而避开0值
         sample[["authorid", "bgm_song_id", "bgm_singer_id", "videoplayseconds"]] = sample[["authorid", "bgm_song_id", "bgm_singer_id", "videoplayseconds"]].fillna(0)
         sample["videoplayseconds"] = np.log(sample["videoplayseconds"] + 1.0) # videoplayseconds>1的情况下取log才为正
-
         sample[["authorid", "bgm_song_id", "bgm_singer_id"]] = sample[["authorid", "bgm_song_id", "bgm_singer_id"]].astype(int)
-        file_name = os.path.join(ROOT_PATH, stage, stage + "_" + action + "_" + str(day) + "_concate_sample.csv")
-        print('Save to: %s'%file_name)
+        file_name = os.path.join(ROOT_PATH, stage, stage + "_" + action + "_" + str(day) + "_concate_sample.csv") # ./data/online_train/online_train_read_comment_14_concate_sample.csv 以及for循环生成的其他5个action对应的文件
+        print('Save to: %s'%file_name) # 加入了自定义统计特征的样本
         sample[features].to_csv(file_name, index=False)
 
 
@@ -230,10 +226,10 @@ def main():
     statis_feature()
     for stage in STAGE_END_DAY: # {'online_train': 14, 'offline_train': 12, 'evaluate': 13, 'submit': 15}
         logger.info("Stage: %s"%stage)
-        logger.info('Generate sample')
+        logger.info('Generate sample') # 样本整理(包括负样本下采样)
         sample_arr = generate_sample(stage)
         logger.info('Concat sample with feature')
-        concat_sample(sample_arr, stage)
+        concat_sample(sample_arr, stage) # 样本拼接
     print('Time cost: %.2f s'%(time.time()-t))
 
 

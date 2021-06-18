@@ -1,14 +1,13 @@
 # coding: utf-8
-
 import os
 import time
 import numpy as np
 import pandas as pd
-import tensorflow.compat.v1 as tf
+import tensorflow.compat.v1 as tf #  when upgate to tf2, it doesn't upgrade your code, but does allow TensorFlow 1 code to run in TensorFlow 2
 from tensorflow import feature_column as fc
 from comm import ACTION_LIST, STAGE_END_DAY, FEA_COLUMN_LIST
 from evaluation import uAUC, compute_weighted_score
-
+import pdb
 
 flags = tf.app.flags
 FLAGS = flags.FLAGS
@@ -22,10 +21,7 @@ flags.DEFINE_float('embed_l2', None, 'embedding l2 reg')
 
 SEED = 2021
 
-
-
 class WideAndDeep(object):
-
     def __init__(self, linear_feature_columns, dnn_feature_columns, stage, action):
         """
         :param linear_feature_columns: List of tensorflow feature_column
@@ -34,8 +30,7 @@ class WideAndDeep(object):
         :param action: String. Including "read_comment"/"like"/"click_avatar"/"favorite"/"forward"/"comment"/"follow"
         """
         super(WideAndDeep, self).__init__()
-        self.num_epochs_dict = {"read_comment": 1, "like": 1, "click_avatar": 1, "favorite": 1, "forward": 1,
-                                "comment": 1, "follow": 1}
+        self.num_epochs_dict = {"read_comment": 1, "like": 1, "click_avatar": 1, "favorite": 1, "forward": 1,"comment": 1, "follow": 1}
         self.estimator = None
         self.linear_feature_columns = linear_feature_columns
         self.dnn_feature_columns = dnn_feature_columns
@@ -55,8 +50,7 @@ class WideAndDeep(object):
         elif self.stage in ["online_train", "offline_train"]:
             # 训练时如果模型目录已存在，则清空目录
             del_file(model_checkpoint_stage_dir)
-        optimizer = tf.train.AdamOptimizer(learning_rate=FLAGS.learning_rate, beta1=0.9, beta2=0.999,
-                                           epsilon=1)
+        optimizer = tf.train.AdamOptimizer(learning_rate=FLAGS.learning_rate, beta1=0.9, beta2=0.999, epsilon=1)
         config = tf.estimator.RunConfig(model_dir=model_checkpoint_stage_dir, tf_random_seed=SEED)
         self.estimator = tf.estimator.DNNLinearCombinedClassifier(
             model_dir=model_checkpoint_stage_dir,
@@ -209,7 +203,7 @@ def get_feature_columns():
 
 def main(argv):
     t = time.time() 
-    dnn_feature_columns, linear_feature_columns = get_feature_columns()
+    dnn_feature_columns, linear_feature_columns = get_feature_columns() # [EmbeddingColumn,...],[NumericColumn,...]
     stage = argv[1]
     print('Stage: %s'%stage)
     eval_dict = {}
